@@ -1,0 +1,40 @@
+//Código em linguagem em c - matéria CPIO 1 - Engenharia Aeroespacial
+#include <stdio.h>
+#include <pbPlots.c>
+#include <supportLib.c>
+#include <math.h>
+
+
+int main()
+{
+    int tam;
+    tam = 496;
+    double y[tam];
+    double x[tam];
+    int i;
+
+    FILE *file;
+    file = fopen("dadosgrafic.txt", "r");
+
+
+
+    for(i=0;i<tam;i++)
+    {
+        fscanf(file, "%lf\n", &y[i]);
+        y[i] = y[i]/2 - 10;
+        x[i] = i * 0.05;
+        printf("%lf %lf\n", y[i], x[i]);
+    }
+
+
+
+  	RGBABitmapImageReference *canvasReference = CreateRGBABitmapImageReference();
+    DrawScatterPlot(canvasReference, 600, 400, x, tam, y, tam, 0);
+    size_t length;
+    double *pngdata=ConvertToPNG(&length,canvasReference->image);
+    WriteToFile(pngdata,length,"graficotestedef.png");
+    DeleteImage(canvasReference->image);
+
+	return 0;
+
+}
