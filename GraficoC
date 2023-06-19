@@ -28,7 +28,7 @@ int main()
 
 
 
-  	RGBABitmapImageReference *canvasReference = CreateRGBABitmapImageReference();
+  RGBABitmapImageReference *canvasReference = CreateRGBABitmapImageReference();
     DrawScatterPlot(canvasReference, 600, 400, x, tam, y, tam, 0);
     size_t length;
     double *pngdata=ConvertToPNG(&length,canvasReference->image);
