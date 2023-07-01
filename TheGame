@@ -4,13 +4,17 @@
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_image.h>
 #include <time.h>
+#include <allegro5/allegro_acodec.h>
+#include <allegro5/allegro_audio.h>
 
-//----------------------------------------------------------- MEDIDAS
+//----------------------------------------------------------- VARIAVEIS GOBAIS
 const float FPS = 70;
 
-const int SCREEN_W = 495;
+const int SCREEN_W = 750;
 
-const int SCREEN_H = 495;
+const int SCREEN_H = 750;
+
+const int MENU_TAMANHO = 750;
 
 const int METEORO_ALTURA = 50;
 
@@ -24,17 +28,35 @@ const int ASTROE_LARGURA = 62;
 
 const int ASTROE_ALTURA = 62;
 
+ALLEGRO_SAMPLE *sweet_som = NULL;
+ALLEGRO_SAMPLE *gameovers = NULL;
+/*ALLEGRO_SAMPLE *explosao = NULL;
+ALLEGRO_SAMPLE *tiro = NULL;
+ALLEGRO_SAMPLE *pulo = NULL;
+ALLEGRO_SAMPLE *moeda = NULL;
+ALLEGRO_SAMPLE *alien = NULL;
+ALLEGRO_SAMPLE *navecaptura = NULL;
+ALLEGRO_SAMPLE *navevoo = NULL;
+ALLEGRO_SAMPLE *win = NULL;
+*/
+
+ALLEGRO_SAMPLE_INSTANCE *inst_sweet_som = NULL;
+ALLEGRO_SAMPLE_INSTANCE *inst_gameovers = NULL;
+
 //------------------------------------------------------------ INÍCIO DO CÓDIGO DO JOGO
 
 int main(int argc, char **argv)
 {
 //------------------------------------------------------------ ****DECLARAÇÃO**** ------------------------------------------------------------
+
     int i;
     srand(time(NULL));
 
     ALLEGRO_DISPLAY *display = NULL;
     ALLEGRO_EVENT_QUEUE *event_queue = NULL;
     ALLEGRO_TIMER *timer = NULL;
+
+    bool gameovers_som = false;
 
 // ERRO DE CRIAÇÃO
     if(!al_init())
@@ -79,11 +101,21 @@ int main(int argc, char **argv)
         return -1;
     }
 
+
+    al_install_audio();
+    al_init_acodec_addon();
+    al_init_font_addon();
+    al_init_ttf_addon();
+    al_reserve_samples(5);
+
+
 // CRIAR PONTEIRO DAS IMAGENS = VARIAVEIS ALLEGRO = cria o endereço da imagem
     ALLEGRO_BITMAP *meteoro = NULL;
     ALLEGRO_BITMAP *astrod = NULL;
     ALLEGRO_BITMAP *astroe = NULL;
     ALLEGRO_BITMAP *marte = NULL;
+    ALLEGRO_BITMAP *menu = NULL;
+    ALLEGRO_BITMAP *gameover = NULL;
 
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
     struct meteoroobj
@@ -114,12 +146,28 @@ int main(int argc, char **argv)
     float astroe_vy = 0;
     float astroe_vx = 0;
 
+    int vida;
+
+    float marte_pos_x = 0;
+    float marte_pos_y =0;
+    float marte_vy = 0;
+    float marte_vx = 0;
+
+    bool menu_ativo = true;
+    bool marte_ativo = false;
+    bool gameover_ativo = false;
+
+    float menu_pos_x = 0;
+    float menu_pos_y =0;
+    float menu_vy = 0;
+    float menu_vx = 0;
 //------------------------------------------------------------ CARREGA AS IMAGENS EM PNG ------------------------------------------------------------
     meteoro =  al_load_bitmap("imagens/meteoro.png");
     astrod = al_load_bitmap("imagens/astrod.png");
     astroe = al_load_bitmap("imagens/astroe.png");
     marte = al_load_bitmap("imagens/marte.png");
-
+    gameover = al_load_bitmap("imagens/gameover.png");
+    menu = al_load_bitmap("imagens/menu.png");
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
 //ERRO NA CRIAÇÃO
     if(!meteoro)
@@ -147,7 +195,32 @@ int main(int argc, char **argv)
         al_destroy_bitmap(meteoro);
         return -1;
     }
+//------------------------------------------------------------ MENU ----------------------------------------------------------------
+// ERRO NA CRIAÇÃO
+    if(!menu)
+    {
+        fprintf(stderr, "falhou ao criar o menu bitmap!\n");
+        al_destroy_display(display);
+        al_destroy_timer(timer);
+        al_destroy_bitmap(meteoro);
+        al_destroy_bitmap(astrod);
+        al_destroy_bitmap(astroe);
+        return -1;
+    }
 
+//------------------------------------------------------------ GAME OVER ------------------------------------------------------------
+//ERRO NA CRIAÇÃO
+    if(!gameover)
+    {
+        fprintf(stderr, "falhou ao criar o menu bitmap!\n");
+        al_destroy_display(display);
+        al_destroy_timer(timer);
+        al_destroy_bitmap(meteoro);
+        al_destroy_bitmap(astrod);
+        al_destroy_bitmap(astroe);
+        al_destroy_bitmap(menu);
+        return -1;
+    }
 //------------------------------------------------------------ PAISAGEM: MARTE ------------------------------------------------------------
 // ERRO NA CRIAÇÃO
     if(!marte)
@@ -158,14 +231,41 @@ int main(int argc, char **argv)
         al_destroy_bitmap(meteoro);
         al_destroy_bitmap(astrod);
         al_destroy_bitmap(astroe);
+        al_destroy_bitmap(menu);
+        al_destroy_bitmap(gameover);
         return -1;
     }
 
+
+    timer= al_create_timer(1.0/FPS);
 
     al_set_target_bitmap(al_get_backbuffer(display));
 
     event_queue = al_create_event_queue();
 
+
+
+    sweet_som = al_load_sample("audios/sweet.ogg");
+
+    inst_sweet_som = al_create_sample_instance(sweet_som);
+
+    al_attach_sample_instance_to_mixer(inst_sweet_som, al_get_default_mixer());
+
+    al_set_sample_instance_playmode(inst_sweet_som, ALLEGRO_PLAYMODE_LOOP);
+
+    al_set_sample_instance_gain(inst_sweet_som, 0.8); //volume da trilha sonora - permite modificar
+
+//https://www.google.com.br/search?q=como+colocar+musica+no+allegro+5&btnK=Pesquisa+Google&sxsrf=ALiCzsZnq3nzMCm6S1oYs2jxv8obgA8pag%3A1672172392375&source=hp&ei=aFOrY-CoFMzT1sQP44aumAg&iflsig=AJiK0e8AAAAAY6theEnsA_2IW26rpwNQnwwoUEIlxI2H&oq=hoteis+proximos+ao+vibra&gs_lcp=Cgdnd3Mtd2l6EAMYADIFCAAQgAQyBwgAEIAEEAoyBggAEBYQHjoLCAAQgAQQsQMQgwE6EQguEIAEELEDEIMBEMcBEK8BOhEILhCABBCxAxCDARDHARDRAzoECCMQJzoICAAQsQMQgwE6CwguEIMBELEDEIAEOgsILhCABBDHARCvAToOCAAQgAQQsQMQgwEQyQM6DQgAEIAEELEDEIMBEAo6DQguEIAEEMcBEK8BEAo6EwguEIAEELEDEIMBEMcBEK8BEApQAFiiPGDrRWgAcAB4AIABuQGIAa4YkgEEMC4yNJgBAKABAQ&sclient=gws-wiz#fpstate=ive&vld=cid:dce17bf7,vid:6n4Zq3I5sY8
+
+    gameovers = al_load_sample("audios/gameoversom.ogg");
+
+    inst_gameovers= al_create_sample_instance(gameovers);
+
+    al_attach_sample_instance_to_mixer(inst_gameovers, al_get_default_mixer());
+
+    al_set_sample_instance_gain(inst_gameovers, 0.8);
+
+// tirar looping do game over
 
 //ERRRO DE CRIAÇÃO - event_queue = caso "erro", destruir meteoro, astrod, astroe, marte, display, timer
     if(!event_queue)
@@ -174,7 +274,9 @@ int main(int argc, char **argv)
         al_destroy_bitmap(meteoro);
         al_destroy_bitmap(astrod);
         al_destroy_bitmap(astroe);
+        al_destroy_bitmap(menu);
         al_destroy_bitmap(marte);
+        al_destroy_bitmap(gameover);
         al_destroy_display(display);
         al_destroy_timer(timer);
         return -1;
@@ -204,135 +306,274 @@ int main(int argc, char **argv)
         if(ev.type == ALLEGRO_EVENT_TIMER)
         {
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
-            for (i=0; i<5; i++)
+            if (!gameover_ativo)
             {
-               if(met[i].ativo==false)
-               {
-                   met[i].pos_x = 100 + (rand()%495);
-                   met[i].pos_y = 0;
-                   met[i].vx = -1 + (rand()%-4);
-                   met[i].vy = 2 + (rand()%8);
-                   met[i].ativo = true;
-                   break;
-               }
-            }
+                al_play_sample_instance(inst_sweet_som);
 
-             for (i=0; i<5; i++)
-             {
-                if (met[i].pos_y > SCREEN_H)
+                if(!menu_ativo)
                 {
-                    met[i].ativo = false;
-                }
-             }
+                    for (i=0; i<5; i++)
+                    {
+                        if(met[i].ativo==false)
+                        {
+                            met[i].pos_x = 100 + (rand()%700);
+                            met[i].pos_y = 0;
+                            met[i].vx = -1 + (rand()%-4);
+                            met[i].vy = 2 + (rand()%8);
+                            met[i].ativo = true;
+                            break;
+                        }
+                    }
+
+                    for (i=0; i<5; i++)
+                    {
+                        if (met[i].pos_y > SCREEN_H)
+                        {
+                            met[i].ativo = false;
+                        }
+                    }
+
 
 //------------------------------------------------------------ ASTRO ------------------------------------------------------------
- //---------------------------- DIREITA
 
-                if(astrod_pos_x < 0 )
-                {
-                    astrod_pos_x = 1;
-                }
+                    if(astrod_pos_y < 0)
+                    {
+                        astrod_pos_y = 0;
+                    }
+                    if(astrod_pos_y > SCREEN_H - ASTROD_ALTURA)
+                    {
+                        astrod_pos_y = SCREEN_H - ASTROD_ALTURA;
+                    }
+                    if(astrod_pos_x < 0)
+                    {
+                        astrod_pos_x = 0;
+                    }
+                    if(astrod_pos_x > SCREEN_W - ASTROD_LARGURA)
+                    {
+                        astrod_pos_x = SCREEN_W - ASTROD_LARGURA;
+                    }
+
+
+                    if(astroe_pos_y < 0)
+                    {
+                        astroe_pos_y = 0;
+                    }
+                    if(astroe_pos_y > SCREEN_H - ASTROE_ALTURA)
+                    {
+                        astroe_pos_y = SCREEN_H - ASTROE_ALTURA;
+                    }
+                    if(astroe_pos_x < 0)
+                    {
+                        astroe_pos_x = 0;
+                    }
+                    if(astroe_pos_x > SCREEN_W - ASTROE_LARGURA)
+                    {
+                        astroe_pos_x = SCREEN_W - ASTROE_LARGURA;
+                        gameover_ativo=true;
+                    }
+
+
+//---------------------------- DIREITA
+
+                    if(astrod_pos_x < 0 )
+                    {
+                        astrod_pos_x = 1;
+                    }
 
 //---------------------------- ESQUERDA
 
-                if(astroe_pos_y < 0 || astroe_pos_y > SCREEN_H - METEORO_ALTURA)
-                {
-                    astroe_vy = -astroe_vy;
-                }
+                    if(astroe_pos_y < 0 || astroe_pos_y > SCREEN_H - METEORO_ALTURA)
+                    {
+                        astroe_vy = -astroe_vy;
+                    }
+
+//------------------------------------------------------------ MARTE ------------------------------------------------------------
+
+                    if(marte_pos_y < 0 )
+                    {
+                        marte_vy = -marte_vy;
+                    }
+
+
+                    if(marte_pos_x < -1380)
+                    {
+                        marte_pos_x = -1380;
+                    }
+
+                    if(marte_pos_x > -5)
+                    {
+                        marte_pos_x = -5;
+                    }
+
 
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
-                for (i=0; i<5; i++)
-                {
-                met[i].pos_x               += met[i].vx;
-                met[i].pos_y               += met[i].vy;
-                }
+                    for (i=0; i<5; i++)
+                    {
+                        met[i].pos_x               += met[i].vx;
+                        met[i].pos_y               += met[i].vy;
+                    }
 //------------------------------------------------------------ ASTRO ------------------------------------------------------------
-                astrod_pos_x                += astrod_vx;
-                astrod_pos_y                += astrod_vy;
-                astroe_pos_x                += astroe_vx;
-                astroe_pos_y                += astroe_vy;
-                redraw                       = true;
-
-            }
-
-//------------------------------------------------------------ ****MOVIMENTAÇÃO MANUAL ASTRO**** ------------------------------------------------------------
-            else if(ev.type == ALLEGRO_EVENT_KEY_DOWN)
-            {
-                switch(ev.keyboard.keycode)
-                {
-
-                case ALLEGRO_KEY_UP:
-                    astrod_vy=-4;
-                    astroe_vy=-4;
-                    break;
-
-                case ALLEGRO_KEY_DOWN:
-                    astrod_vy=4;
-                    astroe_vy=4;
-                    break;
-
-                case ALLEGRO_KEY_RIGHT:
-                    astrod_vx=4;
-                    astroe_vx=4;
-                    astrod_ativo = true;
-                    astroe_ativo = false;
-                    break;
-
-                case ALLEGRO_KEY_LEFT:
-                    astrod_vx=-4;
-                    astroe_vx=-4;
-                    astrod_ativo = false;
-                    astroe_ativo = true;
-                    break;
-
-                case ALLEGRO_KEY_ESCAPE:
-                    return 0;
-                    break;
-                }
-            }
-            else if(ev.type == ALLEGRO_EVENT_KEY_UP)
-            {
-                switch(ev.keyboard.keycode)
-                {
-                case ALLEGRO_KEY_UP:
-                    astrod_vy=0;
-                    astroe_vy=0;
-                    break;
-
-                case ALLEGRO_KEY_DOWN:
-                    astrod_vy=0;
-                    astroe_vy=0;
-                    break;
-
-                case ALLEGRO_KEY_LEFT:
-                    astrod_vx=0;
-                    astroe_vx=0;
-                    astrod_ativo = false;
-                    astroe_ativo = true;
-                    break;
-
-                case ALLEGRO_KEY_RIGHT:
-                    astrod_vx=0;
-                    astroe_vx=0;
-                    astrod_ativo = true;
-                    astroe_ativo = false;
-                    break;
+                    astrod_pos_x                += astrod_vx;
+                    astrod_pos_y                += astrod_vy;
+                    astroe_pos_x                += astroe_vx;
+                    astroe_pos_y                += astroe_vy;
+                    marte_pos_x                 += marte_vx;
+                    marte_pos_y                 += marte_vy;
+                    redraw                       = true;
 
                 }
             }
 
-            else if(ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+        }
+//------------------------------------------------------------ ****MOVIMENTAÇÃO MANUAL ASTRO E MARTE**** ------------------------------------------------------------
+        else if(ev.type == ALLEGRO_EVENT_KEY_DOWN)
+        {
+            switch(ev.keyboard.keycode)
             {
+
+            case ALLEGRO_KEY_UP:
+                if(!menu_ativo)
+                {
+                    astrod_vy=-8;
+                    astroe_vy=-8;
+                    marte_vy=0;
+                }
+                break;
+
+            case ALLEGRO_KEY_DOWN:
+                if(!menu_ativo)
+                {
+                    astrod_vy=8;
+                    astroe_vy=8;
+                    marte_vy=0;
+                }
+                break;
+
+            case ALLEGRO_KEY_RIGHT:
+                if(!menu_ativo)
+                {
+                    astrod_vx=2;
+                    astroe_vx=2;
+                    marte_vx=-5;
+                    astrod_ativo = true;
+                    astroe_ativo = false;
+                }
+                break;
+
+            case ALLEGRO_KEY_LEFT:
+                if(!menu_ativo)
+                {
+                    astrod_vx=-1;
+                    astroe_vx=-1;
+                    marte_vx=3;
+                    astrod_ativo = false;
+                    astroe_ativo = true;
+                }
+                break;
+
+            case ALLEGRO_KEY_SPACE:
+                if(!menu_ativo)
+                {
+                    astrod_vy=-7;
+                    astroe_vy=-7;
+                }
+                break;
+
+            case ALLEGRO_KEY_ENTER:
+                astrod_vx=-1;
+                astroe_vx=-1;
+                marte_vx=3;
+                marte_ativo = true;
+                menu_ativo = false;
+                astrod_ativo = true;
+                astroe_ativo = false;
+                met[i].ativo= true;
+                break;
+
+            case ALLEGRO_KEY_ESCAPE:
+                return 0;
                 break;
             }
+        }
+        else if(ev.type == ALLEGRO_EVENT_KEY_UP)
+        {
+            switch(ev.keyboard.keycode)
+            {
+            case ALLEGRO_KEY_UP:
+                astrod_vy=0;
+                astroe_vy=0;
+                marte_vy=0;
+                break;
+
+            case ALLEGRO_KEY_DOWN:
+                astrod_vy=0;
+                astroe_vy=0;
+                marte_vy=0;
+                break;
+
+            case ALLEGRO_KEY_LEFT:
+                astrod_vx=0;
+                astroe_vx=0;
+                astrod_ativo = false;
+                astroe_ativo = true;
+                marte_vx=0;
+                break;
+
+            case ALLEGRO_KEY_RIGHT:
+                astrod_vx=0;
+                astroe_vx=0;
+                astrod_ativo = true;
+                astroe_ativo = false;
+                marte_vx=0;
+                break;
+
+            case ALLEGRO_KEY_ENTER:
+                astrod_vx=0;
+                astroe_vx=0;
+                marte_vx=0;
+                marte_ativo = true;
+                menu_ativo = false;
+                astrod_ativo = true;
+                astroe_ativo = false;
+                met[i].ativo = true;
+                break;
+
+            }
+        }
+
+        else if(ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+        {
+            break;
+        }
 
 //------------------------------------------------------------ ****GARREGAR OS DESENHOS**** ------------------------------------------------------------
 
-            if(redraw && al_is_event_queue_empty(event_queue))
+        if(redraw && al_is_event_queue_empty(event_queue))
+        {
+            redraw = false;
+
+            al_clear_to_color(al_map_rgb(0,100,0));
+
+            if(!gameover_ativo)
             {
-                redraw = false;
-                al_clear_to_color(al_map_rgb(0,100,0));
-                al_draw_bitmap(marte, 0, 0, 0);
+            if(!menu_ativo)
+            {
+
+
+            al_draw_bitmap(marte, marte_pos_x, marte_pos_y, 0);
+
+
+            if (marte_ativo==true)
+            {
+                al_draw_bitmap(marte,marte_pos_x, marte_pos_y, 0);
+            }
+
+            for (i=0; i<5; i++)
+            {
+                if(met[i].ativo==true)
+                {
+                    al_draw_bitmap(meteoro, met[i].pos_x, met[i].pos_y, 0);
+                }
 
                 if (astrod_ativo==true)
                 {
@@ -342,25 +583,37 @@ int main(int argc, char **argv)
                 {
                     al_draw_bitmap(astroe,astroe_pos_x, astroe_pos_y, 0);
                 }
-                for (i=0; i<5; i++)
-                {
-                if(met[i].ativo==true)
-                {
-                    al_draw_bitmap(meteoro, met[i].pos_x, met[i].pos_y, 0);
-                }
-                }
-                al_flip_display();
             }
+            }
+            }
+                if(menu_ativo)
+                {
+                    al_draw_bitmap(menu,0, 0, 0);
+                }
+                if (gameover_ativo)
+                {
+                    al_draw_bitmap(gameover, 0, 0, 0);
+                    al_stop_sample_instance(inst_sweet_som);
+                    al_play_sample_instance(inst_gameovers);
+                }
+            al_flip_display();
+
         }
 
-
-        al_destroy_bitmap(meteoro);
-        al_destroy_bitmap(astrod);
-        al_destroy_bitmap(astroe);
-        al_destroy_timer(timer);
-        al_destroy_display(display);
-        al_destroy_event_queue(event_queue);
-
-
-        return 0;
     }
+
+    al_destroy_bitmap(menu);
+    al_destroy_bitmap(gameover);
+    al_destroy_bitmap(meteoro);
+    al_destroy_bitmap(astrod);
+    al_destroy_bitmap(astroe);
+    al_destroy_timer(timer);
+    al_destroy_display(display);
+    al_destroy_event_queue(event_queue);
+    al_destroy_sample(sweet_som);
+    al_destroy_sample(gameovers);
+    al_destroy_sample_instance(inst_sweet_som);
+    al_destroy_sample_instance(inst_gameovers);
+
+    return 0;
+}
