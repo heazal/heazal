@@ -29,7 +29,7 @@ const int ASTROE_LARGURA = 62;
 const int ASTROE_ALTURA = 62;
 
 ALLEGRO_SAMPLE *sweet_som = NULL;
-ALLEGRO_SAMPLE *gameovers = NULL;
+ALLEGRO_SAMPLE *wins = NULL;
 /*ALLEGRO_SAMPLE *explosao = NULL;
 ALLEGRO_SAMPLE *tiro = NULL;
 ALLEGRO_SAMPLE *pulo = NULL;
@@ -41,7 +41,7 @@ ALLEGRO_SAMPLE *win = NULL;
 */
 
 ALLEGRO_SAMPLE_INSTANCE *inst_sweet_som = NULL;
-ALLEGRO_SAMPLE_INSTANCE *inst_gameovers = NULL;
+ALLEGRO_SAMPLE_INSTANCE *inst_wins = NULL;
 
 //------------------------------------------------------------ INÍCIO DO CÓDIGO DO JOGO
 
@@ -56,7 +56,6 @@ int main(int argc, char **argv)
     ALLEGRO_EVENT_QUEUE *event_queue = NULL;
     ALLEGRO_TIMER *timer = NULL;
 
-    bool gameovers_som = false;
 
 // ERRO DE CRIAÇÃO
     if(!al_init())
@@ -115,7 +114,7 @@ int main(int argc, char **argv)
     ALLEGRO_BITMAP *astroe = NULL;
     ALLEGRO_BITMAP *marte = NULL;
     ALLEGRO_BITMAP *menu = NULL;
-    ALLEGRO_BITMAP *gameover = NULL;
+    ALLEGRO_BITMAP *win = NULL;
 
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
     struct meteoroobj
@@ -155,18 +154,14 @@ int main(int argc, char **argv)
 
     bool menu_ativo = true;
     bool marte_ativo = false;
-    bool gameover_ativo = false;
+    bool win_ativo = false;
 
-    float menu_pos_x = 0;
-    float menu_pos_y =0;
-    float menu_vy = 0;
-    float menu_vx = 0;
 //------------------------------------------------------------ CARREGA AS IMAGENS EM PNG ------------------------------------------------------------
     meteoro =  al_load_bitmap("imagens/meteoro.png");
     astrod = al_load_bitmap("imagens/astrod.png");
     astroe = al_load_bitmap("imagens/astroe.png");
     marte = al_load_bitmap("imagens/marte.png");
-    gameover = al_load_bitmap("imagens/gameover.png");
+    win = al_load_bitmap("imagens/win.png");
     menu = al_load_bitmap("imagens/menu.png");
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
 //ERRO NA CRIAÇÃO
@@ -210,9 +205,9 @@ int main(int argc, char **argv)
 
 //------------------------------------------------------------ GAME OVER ------------------------------------------------------------
 //ERRO NA CRIAÇÃO
-    if(!gameover)
+    if(!win)
     {
-        fprintf(stderr, "falhou ao criar o menu bitmap!\n");
+        fprintf(stderr, "falhou ao criar o win bitmap!\n");
         al_destroy_display(display);
         al_destroy_timer(timer);
         al_destroy_bitmap(meteoro);
@@ -232,7 +227,7 @@ int main(int argc, char **argv)
         al_destroy_bitmap(astrod);
         al_destroy_bitmap(astroe);
         al_destroy_bitmap(menu);
-        al_destroy_bitmap(gameover);
+        al_destroy_bitmap(win);
         return -1;
     }
 
@@ -257,15 +252,14 @@ int main(int argc, char **argv)
 
 //https://www.google.com.br/search?q=como+colocar+musica+no+allegro+5&btnK=Pesquisa+Google&sxsrf=ALiCzsZnq3nzMCm6S1oYs2jxv8obgA8pag%3A1672172392375&source=hp&ei=aFOrY-CoFMzT1sQP44aumAg&iflsig=AJiK0e8AAAAAY6theEnsA_2IW26rpwNQnwwoUEIlxI2H&oq=hoteis+proximos+ao+vibra&gs_lcp=Cgdnd3Mtd2l6EAMYADIFCAAQgAQyBwgAEIAEEAoyBggAEBYQHjoLCAAQgAQQsQMQgwE6EQguEIAEELEDEIMBEMcBEK8BOhEILhCABBCxAxCDARDHARDRAzoECCMQJzoICAAQsQMQgwE6CwguEIMBELEDEIAEOgsILhCABBDHARCvAToOCAAQgAQQsQMQgwEQyQM6DQgAEIAEELEDEIMBEAo6DQguEIAEEMcBEK8BEAo6EwguEIAEELEDEIMBEMcBEK8BEApQAFiiPGDrRWgAcAB4AIABuQGIAa4YkgEEMC4yNJgBAKABAQ&sclient=gws-wiz#fpstate=ive&vld=cid:dce17bf7,vid:6n4Zq3I5sY8
 
-    gameovers = al_load_sample("audios/gameoversom.ogg");
+    wins = al_load_sample("audios/winsom.ogg");
 
-    inst_gameovers= al_create_sample_instance(gameovers);
+    inst_wins= al_create_sample_instance(wins);
 
-    al_attach_sample_instance_to_mixer(inst_gameovers, al_get_default_mixer());
+    al_attach_sample_instance_to_mixer(inst_wins, al_get_default_mixer());
 
-    al_set_sample_instance_gain(inst_gameovers, 0.8);
+    al_set_sample_instance_gain(inst_wins, 1.5);
 
-// tirar looping do game over
 
 //ERRRO DE CRIAÇÃO - event_queue = caso "erro", destruir meteoro, astrod, astroe, marte, display, timer
     if(!event_queue)
@@ -276,7 +270,7 @@ int main(int argc, char **argv)
         al_destroy_bitmap(astroe);
         al_destroy_bitmap(menu);
         al_destroy_bitmap(marte);
-        al_destroy_bitmap(gameover);
+        al_destroy_bitmap(win);
         al_destroy_display(display);
         al_destroy_timer(timer);
         return -1;
@@ -306,7 +300,7 @@ int main(int argc, char **argv)
         if(ev.type == ALLEGRO_EVENT_TIMER)
         {
 //------------------------------------------------------------ METEORO ------------------------------------------------------------
-            if (!gameover_ativo)
+            if (!win_ativo)
             {
                 al_play_sample_instance(inst_sweet_som);
 
@@ -369,7 +363,7 @@ int main(int argc, char **argv)
                     if(astroe_pos_x > SCREEN_W - ASTROE_LARGURA)
                     {
                         astroe_pos_x = SCREEN_W - ASTROE_LARGURA;
-                        gameover_ativo=true;
+                        win_ativo=true;
                     }
 
 
@@ -554,7 +548,7 @@ int main(int argc, char **argv)
 
             al_clear_to_color(al_map_rgb(0,100,0));
 
-            if(!gameover_ativo)
+            if(!win_ativo)
             {
             if(!menu_ativo)
             {
@@ -590,11 +584,11 @@ int main(int argc, char **argv)
                 {
                     al_draw_bitmap(menu,0, 0, 0);
                 }
-                if (gameover_ativo)
+                if (win_ativo)
                 {
-                    al_draw_bitmap(gameover, 0, 0, 0);
+                    al_draw_bitmap(win, 0, 0, 0);
                     al_stop_sample_instance(inst_sweet_som);
-                    al_play_sample_instance(inst_gameovers);
+                    al_play_sample_instance(inst_wins);
                 }
             al_flip_display();
 
@@ -603,7 +597,7 @@ int main(int argc, char **argv)
     }
 
     al_destroy_bitmap(menu);
-    al_destroy_bitmap(gameover);
+    al_destroy_bitmap(win);
     al_destroy_bitmap(meteoro);
     al_destroy_bitmap(astrod);
     al_destroy_bitmap(astroe);
@@ -611,9 +605,131 @@ int main(int argc, char **argv)
     al_destroy_display(display);
     al_destroy_event_queue(event_queue);
     al_destroy_sample(sweet_som);
-    al_destroy_sample(gameovers);
+    al_destroy_sample(wins);
     al_destroy_sample_instance(inst_sweet_som);
-    al_destroy_sample_instance(inst_gameovers);
+    al_destroy_sample_instance(inst_wins);
+
+    return 0;
+}
+
+/* movimentação do personagem com gravidade
+
+#define screenWidth 800
+#define screenHeight 600
+
+int main()
+{
+    ALLEGRO_DISPLAY *display;
+
+    enum Direction{DOWN, LEFT,RIGHT, UP};
+
+    const float FPS = 70.0;
+
+    if(!al_init())
+        al_show_native_message_box(NULL, "Error", NULL, "Could not Initialize Allegro", NULL, NULL);
+
+    display = al_create_display(screenWidth, screenHeight);
+
+    if(!display)
+        al_show_native_message_box(NULL,"Error", NULL, "Could not create Allegro Display", NULL, NULL);
+
+    al_set_window_position(display, 200,200);
+
+    bool done = false, draw= true, active=false;
+    float x = 10, y=10, moveSpeed = 5;
+    float velx, vely;
+    velx = vely = 0;
+    int dir = DOWN, sourceX = 64, sourceY = 0;
+
+    bool jump = false;
+    float jumpSpeed = 20;
+
+
+    const float gravity = 1;
+
+    al_install_keyboard();
+    al_init_image_addon();
+
+    ALLEGRO_BITMAP *player = al_load_bitmap("imagens/astro.png");
+
+    ALLEGRO_KEYBOARD_STATE keyState;
+
+    ALLEGRO_TIMER *timer = al_create_timer(1.0 / FPS);
+    ALLEGRO_EVENT_QUEUE *event_queue = al_create_event_queue();
+    al_register_event_source(event_queue, al_get_timer_event_source(timer));
+    al_register_event_source(event_queue, al_get_display_event_source(display));
+    al_register_event_source(event_queue, al_get_keyboard_event_source());
+
+    al_start_timer(timer);
+
+    while(!done)
+    {
+        ALLEGRO_EVENT events;
+            al_wait_for_event(event_queue, &events);
+            al_get_keyboard_state(&keyState);
+
+            if(events.type ==ALLEGRO_EVENT_DISPLAY_CLOSE)
+            {
+                done=true;
+            }
+            else if (events.type == ALLEGRO_EVENT_TIMER)
+            {
+                active = true;
+                    if (al_key_down(&keyState, ALLEGRO_KEY_RIGHT))
+                    {
+                        velx = moveSpeed;
+                        dir = RIGHT;
+                    }
+                    else if (al_key_down(&keyState, ALLEGRO_KEY_LEFT))
+                    {
+                        velx = -moveSpeed;
+                        dir = LEFT;
+                    }
+
+                else
+                {
+                    velx = 0;
+                    active = false;
+                }
+                if (al_key_down(&keyState, ALLEGRO_KEY_UP) && jump)
+                    {
+                        vely = - jumpSpeed;
+                        jump = false;
+                    }
+
+                if(active)
+                    sourceX += al_get_bitmap_width(player)/3;
+                else
+                    sourceX = 80;
+
+                if(sourceX >= al_get_bitmap_width(player))
+                    sourceX = 0;
+
+                sourceY = dir;
+
+                if(!jump)
+                    vely += gravity;
+                else
+                    vely +=0;
+                x += velx;
+                y += vely;
+
+
+                jump = (y + 64>= 256);
+
+                if(jump)
+                    y = 256 - 64;
+
+                draw = true;
+            }
+
+            if(draw)
+            {
+                al_draw_bitmap_region(player, sourceX, sourceY * al_get_bitmap_height(player)/4,51,64,x,y,NULL);
+                al_flip_display();
+                al_clear_to_color(al_map_rgb(0,0,0));
+            }
+    }
 
     return 0;
 }
